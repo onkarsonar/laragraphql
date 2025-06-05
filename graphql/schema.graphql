@@ -1,0 +1,81 @@
+"A datetime string with format `Y-m-d H:i:s`, e.g. `2018-05-23 13:43:32`."
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+"Indicates what fields are available at the top level of a query operation."
+type Query {
+    "Find a single user by an identifying attribute."
+    user(
+      "Search by primary key."
+      # @eq means like where condition of sql
+      id: ID @eq @rules(apply: ["prohibits:email", "required_without:email"])  
+      
+      # prohibits:email - If you're using id, then don't use email.
+      # "required_without:email" - id is required if email is not present.
+
+      "Search by email address."
+      email: String @eq @rules(apply: ["prohibits:id", "required_without:id", "email"])
+    ): User @find
+
+    "List multiple users."
+    userlist(
+      "Filters by name. Accepts SQL LIKE wildcards `%` and `_`."
+      name: String @where(operator: "like")
+    ): [User!]! @paginate(defaultCount: 10)
+
+    userById (id:ID! @eq) : User! @find 
+
+    # ! - means not nullable, value can not be null
+    #  User! inside the brackets
+    #    Each element inside the list must be a non-null User object.
+    #    So, no item in the list can be null.
+
+    #    The outer ! after the brackets
+    #    The list itself cannot be null.
+    #    So, you will always get a list (possibly empty []), but never null.
+    # It helps GraphQL clients understand what to expect and helps avoid null-related # errors.
+}
+
+"Account of a person who utilizes this application."
+type User {
+    "Unique primary key."
+    id: ID!
+
+    "Non-unique name."
+    name: String!
+
+    "Unique email address."
+    email: String!
+
+    "When the account was created."
+    created_at: DateTime!
+
+    "When the account was last updated."
+    updated_at: DateTime!
+}
+
+type Mutation {
+  # means send the fields inside the input directly, not wrapped inside an input object.
+  # Its type is CreateUserInput, which is an input object type you define that contains the data needed to create a user (like name, email).
+  # This is a Lighthouse directive that automatically handles the creation of a model using the provided input.
+
+  # Behind the scenes, it calls Laravel's Eloquent create method with the input fields.
+
+  # createUser(input:CreateUserInput @spread): User @create
+
+  createUser(input: CreateUserInput!): User! @field(resolver: "App\\GraphQL\\Resolvers\\UserResolver@createUser")
+
+  updateUser(id: ID, input:UpdateUserInput @spread): User  @update
+  deleteUser(id: ID @eq): User  @delete
+}
+
+ input CreateUserInput {
+ name: String!
+  email: String! @rules(apply:["email","unique:users,email"])
+ }
+
+input UpdateUserInput {
+  name: String!
+  email: String! @rules(apply:["email","unique:users,email"])
+
+}
+
